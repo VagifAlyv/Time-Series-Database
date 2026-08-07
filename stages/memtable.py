@@ -35,7 +35,6 @@ class MemTable:
             self.current_size += entry_size
             return True
 
-
     def freeze(self) -> dict[str, list[tuple[int, float]]]:
         with self.lock:
             self.isimmutable = True
@@ -45,4 +44,49 @@ class MemTable:
         with self.lock:
             return self.current_size > self.max_bytes
 
+    def clear(self):
+        with self.lock:
+            self._table = {}
+            self.current_size = 0
+            self.isimmutable = False
+            self.data = []
+
+    def count(self) -> int:
+       with self.lock:
+        return sum(len(series_points) for series_points in self._table.values())
+
+    def get_latest(self, series_id : str) -> tuple[int, float] | None:
+        with self.lock:
+            points = self._table.get(series_id)
+            return points[-1] if points else None
         
+    def is_empty(self) -> bool:
+        with self.lock:
+            return not self._table
+
+    def size_bytes(self) -> int:
+        with self.lock:
+            return self.current_size
+
+    def get(self, series_id : str, timestamp : int) -> float:
+        with self.lock:
+            points = self._table.get(series_id)
+            if not points:
+                return None
+
+            for ts, value in points:
+                if ts == timestamp:
+                    return value
+            return None
+
+    def delete(self, series_id: str, timestamp: int) -> bool:
+        with self.lock:
+            if self.isimmutable:
+                return False
+
+        if series_id in self._table:
+            del self._table[series_id]
+            return True
+
+        return False
+    
