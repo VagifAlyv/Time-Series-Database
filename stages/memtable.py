@@ -16,8 +16,33 @@ class MemTable:
             if self.isimmutable is True:
                 return False
 
+            entry_size = len(series_id.encode('utf-8')) + 8 + 8
+            if self.current_size + entry_size > self.max_bytes:
+                return False
 
+            if series_id not in self._table:
+                self._table[series_id] = []
+
+            points = self._table[series_id]
+            data_point = (timestamp, value)
+
+            if not points or timestamp >= points[-1][0]:
+                points.append(data_point)
+
+            else:
+                bisect.insort(points, data_point)
+
+            self.current_size += entry_size
+            return True
+
+
+    def freeze(self) -> dict[str, list[tuple[int, float]]]:
+        with self.lock:
+            self.isimmutable = True
+            return self.table
 
     def is_full(self) -> bool:
         with self.lock:
             return self.current_size > self.max_bytes
+
+        
